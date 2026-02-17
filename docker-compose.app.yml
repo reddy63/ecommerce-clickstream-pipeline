@@ -1,0 +1,21 @@
+services:
+
+  producer:
+    build: ./producer
+    container_name: producer
+    networks:
+      - infra-net
+
+  spark-streaming:
+    build: ./spark-streaming
+    container_name: spark-streaming
+    environment:
+      HADOOP_CONF_DIR: /opt/hadoop/etc/hadoop
+      USER: spark
+    restart: unless-stopped
+    networks:
+      - infra-net
+
+networks:
+  infra-net:
+    external: true

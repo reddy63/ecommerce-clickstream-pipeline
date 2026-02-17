@@ -1,0 +1,229 @@
+Ecommerce Clickstream Data Pipeline
+
+A production-style end-to-end Data Engineering pipeline built using Kafka, Spark, HDFS, Airflow, PostgreSQL, Docker, and Metabase.
+
+This project simulates real-time ecommerce clickstream data ingestion, transformation using the Medallion Architecture (Bronze → Silver → Gold), and serves analytics-ready data to PostgreSQL for dashboard visualization.
+
+📌 Architecture Overview
+FakeStore API
+     ↓
+Kafka (Streaming Ingestion)
+     ↓
+Spark Structured Streaming (Bronze Layer → HDFS)
+     ↓
+Spark Batch (Silver Layer - Clean & Deduplicate)
+     ↓
+Spark Aggregation (Gold Layer - Business Metrics)
+     ↓
+PostgreSQL (Analytics DB)
+     ↓
+Metabase (Dashboard)
+
+🏗 Tech Stack
+Layer	Technology
+Streaming	Apache Kafka
+Processing	Apache Spark (Structured Streaming + Batch)
+Storage	HDFS
+Orchestration	Apache Airflow
+Database	PostgreSQL
+Visualization	Metabase
+Containerization	Docker & Docker Compose
+
+📂 Project Structure
+ecommerce-clickstream-pipeline/
+│
+├── airflow/
+│   ├── dags/
+│   │   └── clickstream_pipeline_dag.py
+│   └── Dockerfile
+│
+├── spark-jobs/
+│   ├── silver_clickstream.py
+│   ├── gold_clickstream.py
+│   └── gold_to_postgres.py
+│
+├── spark-streaming/
+│   ├── clickstream_streaming.py
+│   └── Dockerfile
+│
+├── producer/
+│   ├── producer.py
+│   └── Dockerfile
+│
+├── docker-compose.infra.yml
+├── docker-compose.app.yml
+├── docker-compose.airflow.yml
+├── .env
+└── README.md
+
+🥉 Bronze Layer (Raw Data)
+
+Source: https://fakestoreapi.com/products
+
+Data ingested via Kafka
+
+Spark Structured Streaming writes raw JSON → HDFS (Parquet)
+
+Partitioned storage
+
+Checkpointing enabled
+
+Schema:
+
+{
+  "product_id": int,
+  "category": string,
+  "price": double,
+  "event_ts": long
+}
+
+🥈 Silver Layer (Clean & Transform)
+
+Convert epoch → timestamp
+
+Add event_date
+
+Deduplicate records
+
+Partition by event_date
+
+Stored in HDFS
+
+🥇 Gold Layer (Business Metrics)
+
+Aggregated KPIs:
+
+Total Events per Category
+
+Total Revenue per Category
+
+Grouped by event_date
+
+Example Output:
+
+category	total_events	total_revenue	event_date
+electronics	54	17954.91	2026-02-17
+🗄 PostgreSQL Analytics Table
+
+Table: clickstream_metrics
+
+CREATE TABLE clickstream_metrics (
+    category TEXT,
+    total_events INT,
+    total_revenue DOUBLE PRECISION,
+    event_date DATE,
+    PRIMARY KEY (category, event_date)
+);
+
+
+Loaded using Spark JDBC connector.
+
+🎯 Airflow Orchestration
+
+DAG: clickstream_pipeline
+
+Tasks:
+
+silver_layer
+
+gold_layer
+
+gold_to_postgres
+
+Schedule: @hourly
+
+Retry enabled.
+
+📊 Dashboard (Metabase)
+
+Connect to PostgreSQL
+
+Create visualizations:
+
+Revenue by Category
+
+Daily Events
+
+Trend analysis
+
+Top categories
+
+Access:
+
+http://localhost:3000
+
+🐳 How to Run the Project
+1️⃣ Clone Repository
+git clone https://github.com/your-username/ecommerce-clickstream-pipeline.git
+cd ecommerce-clickstream-pipeline
+
+2️⃣ Create .env File
+
+Example:
+
+POSTGRES_HOST=postgre
+POSTGRES_USER=arun
+POSTGRES_PASSWORD=yourpassword
+POSTGRES_DB=airflow
+POSTGRES_DB1=analytics
+POSTGRES_PORT=5432
+
+3️⃣ Start Infrastructure
+docker compose -f docker-compose.infra.yml up -d
+
+4️⃣ Start Streaming App
+docker compose -f docker-compose.app.yml up -d --build
+
+5️⃣ Start Airflow
+docker compose -f docker-compose.airflow.yml up -d --build
+
+
+Airflow UI:
+
+http://localhost:8081
+
+🔥 Key Engineering Concepts Demonstrated
+
+✔ Medallion Architecture
+✔ Real-time Streaming
+✔ Batch Processing
+✔ Distributed Storage (HDFS)
+✔ DAG Orchestration
+✔ Spark JDBC Integration
+✔ Containerized Microservices
+✔ Environment Variable Management
+✔ Production-style Project Structure
+
+📈 Scalability Improvements (Future Enhancements)
+
+Replace LocalExecutor → CeleryExecutor
+
+Add Delta Lake
+
+Add Data Quality checks
+
+Add CI/CD pipeline
+
+Deploy to AWS (EMR + MSK + RDS)
+
+Add dbt for transformations
+
+👨‍💻 Author
+
+Arun Reddy
+Entry-Level Data Engineer
+Tech: Python | SQL | Spark | Kafka | Airflow | AWS
+
+⭐ Why This Project Matters
+
+This project demonstrates:
+
+End-to-end pipeline thinking
+
+Real-world orchestration
+
+Distributed systems understanding
+
+Production-ready architecture
+
+Strong foundation for Data Engineering roles
