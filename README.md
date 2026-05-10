@@ -74,6 +74,10 @@ Schema:
   "product_id": int,
   "category": string,
   "price": double,
+  "title": string,
+  "description": string,
+  "rating_rate": double,
+  "rating_count": int,
   "event_ts": long
 }
 

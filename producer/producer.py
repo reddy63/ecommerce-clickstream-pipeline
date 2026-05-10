@@ -30,6 +30,10 @@ while True:
                 "product_id": p["id"],
                 "category": p["category"],
                 "price": p["price"],
+                "title": p.get("title", ""),
+                "description": p.get("description", ""),
+                "rating_rate": p.get("rating", {}).get("rate", 0.0) if isinstance(p.get("rating"), dict) else 0.0,
+                "rating_count": p.get("rating", {}).get("count", 0) if isinstance(p.get("rating"), dict) else 0,
                 "event_ts": int(time.time())
             }
             producer.send("clickstream", event)

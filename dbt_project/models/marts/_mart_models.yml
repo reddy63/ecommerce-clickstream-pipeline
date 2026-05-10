@@ -1,0 +1,53 @@
+version: 2
+
+models:
+  - name: fct_category_metrics
+    description: "Daily metrics per product category with revenue ranking and percentage"
+    columns:
+      - name: category
+        description: "Product category"
+        tests:
+          - not_null
+      - name: event_date
+        description: "Date of events"
+        tests:
+          - not_null
+      - name: total_events
+        description: "Count of events for this category on this date"
+      - name: total_revenue
+        description: "Sum of revenue for this category on this date"
+      - name: revenue_pct_of_day
+        description: "Percentage of total daily revenue this category represents"
+      - name: revenue_rank
+        description: "Rank of this category by revenue within the day (1 = highest)"
+      - name: dbt_updated_at
+        description: "Timestamp when dbt last updated this record"
+
+  - name: fct_daily_revenue
+    description: "Daily revenue summary aggregated across all product categories"
+    columns:
+      - name: event_date
+        description: "Date of events"
+        tests:
+          - not_null
+          - unique
+      - name: unique_categories
+        description: "Number of distinct product categories active on this date"
+      - name: total_events
+        description: "Total events across all categories"
+        tests:
+          - dbt_utils.accepted_range:
+              min_value: 0
+              inclusive: true
+      - name: total_revenue
+        description: "Total revenue across all categories"
+        tests:
+          - dbt_utils.accepted_range:
+              min_value: 0
+              inclusive: true
+      - name: avg_price_per_event
+        description: "Average price per event across all categories"
+      - name: top_category_revenue
+        description: "Revenue of the highest-earning category on this date"
+      - name: dbt_updated_at
+        description: "Timestamp when dbt last updated this record"

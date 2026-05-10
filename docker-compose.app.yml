@@ -16,6 +16,22 @@ services:
     networks:
       - infra-net
 
+  dbt:
+    build: ./dbt_project
+    container_name: dbt
+    env_file:
+      - .env
+    environment:
+      POSTGRES_HOST: ${POSTGRES_HOST}
+      POSTGRES_PORT: ${POSTGRES_PORT}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB1: ${POSTGRES_DB1}
+    networks:
+      - infra-net
+    profiles:
+      - dbt
+
 networks:
   infra-net:
     external: true

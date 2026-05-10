@@ -1,0 +1,12 @@
+ecommerce_clickstream:
+  target: dev
+  outputs:
+    dev:
+      type: postgres
+      host: "{{ env_var('POSTGRES_HOST', 'postgre') }}"
+      port: "{{ env_var('POSTGRES_PORT', '5432') | int }}"
+      user: "{{ env_var('POSTGRES_USER', 'arun') }}"
+      pass: "{{ env_var('POSTGRES_PASSWORD', 'Arun!555') }}"
+      dbname: "{{ env_var('POSTGRES_DB1', 'analytics') }}"
+      schema: public
+      threads: 2

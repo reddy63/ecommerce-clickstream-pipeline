@@ -13,6 +13,10 @@ schema = StructType([
     StructField("product_id", IntegerType(), True),
     StructField("category", StringType(), True),
     StructField("price", DoubleType(), True),
+    StructField("title", StringType(), True),
+    StructField("description", StringType(), True),
+    StructField("rating_rate", DoubleType(), True),
+    StructField("rating_count", IntegerType(), True),
     StructField("event_ts", LongType(), True)
 ])
 

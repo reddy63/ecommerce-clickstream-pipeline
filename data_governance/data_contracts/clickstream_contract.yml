@@ -1,0 +1,87 @@
+# Data Contract: Clickstream Pipeline
+# Version: 1.0.0
+# Last Updated: 2026-03-30
+
+contract:
+  name: clickstream_pipeline
+  version: "1.0.0"
+  owner: "arun"
+  description: >
+    End-to-end clickstream data pipeline consuming product data from
+    the Fake Store API, streaming through Kafka, processing via Spark
+    (Bronze → Silver → Gold), and serving to PostgreSQL for analytics.
+
+data_source:
+  name: Fake Store API
+  url: https://fakestoreapi.com/products
+  type: REST API
+  refresh_interval: "30 seconds"
+
+sla:
+  freshness:
+    bronze: "5 minutes"
+    silver: "1 hour"
+    gold: "2 hours"
+    dbt_marts: "3 hours"
+  availability: "99%"
+  incident_response: "4 hours"
+
+layers:
+  bronze:
+    location: "hdfs://namenode:9000/data/bronze"
+    format: parquet
+    schema_ref: "data_governance/schemas/bronze_schema.json"
+    description: "Raw events from Kafka, written by Spark Streaming"
+
+  silver:
+    location: "hdfs://namenode:9000/data/silver"
+    format: parquet
+    schema_ref: "data_governance/schemas/silver_schema.json"
+    description: "Deduplicated and enriched events with timestamps"
+    partitioned_by: event_date
+
+  gold:
+    location: "hdfs://namenode:9000/data/gold"
+    format: parquet
+    schema_ref: "data_governance/schemas/gold_schema.json"
+    description: "Aggregated category metrics by date"
+    partitioned_by: event_date
+
+  postgres:
+    host: "postgre"
+    database: "analytics"
+    table: "clickstream_metrics"
+    description: "Gold data served to PostgreSQL for BI tools"
+
+  dbt_marts:
+    database: "analytics"
+    models:
+      - name: stg_clickstream
+        schema: staging
+        type: view
+        description: "Cleaned and standardized clickstream data"
+      - name: fct_category_metrics
+        schema: marts
+        type: table
+        description: "Category metrics with revenue ranking"
+      - name: fct_daily_revenue
+        schema: marts
+        type: table
+        description: "Daily revenue summary"
+
+quality_rules:
+  - rule: "No null categories"
+    layer: [silver, gold]
+    enforcement: dbt_test
+  - rule: "No negative revenue"
+    layer: [gold, dbt_marts]
+    enforcement: dbt_test
+  - rule: "No future event dates"
+    layer: [gold, dbt_marts]
+    enforcement: dbt_test
+  - rule: "Price must be >= 0"
+    layer: [bronze, silver]
+    enforcement: schema_validation
+  - rule: "Event count must be >= 0"
+    layer: [gold]
+    enforcement: dbt_test

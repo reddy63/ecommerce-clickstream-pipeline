@@ -23,7 +23,8 @@ gold_df.write \
     .option("user", POSTGRES_USER) \
     .option("password", POSTGRES_PASSWORD) \
     .option("driver", "org.postgresql.Driver") \
-    .mode("append") \
+    .option("truncate", "true") \
+    .mode("overwrite") \
     .save()
 
 spark.stop()

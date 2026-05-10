@@ -1,0 +1,32 @@
+version: 2
+
+models:
+  - name: stg_clickstream
+    description: "Cleaned and standardized clickstream metrics from the Spark Gold layer"
+    columns:
+      - name: category
+        description: "Product category (e.g. electronics, jewelery, men's clothing, women's clothing)"
+        tests:
+          - not_null
+      - name: event_date
+        description: "Date of the aggregated events"
+        tests:
+          - not_null
+      - name: total_events
+        description: "Total number of events for this category on this date"
+        tests:
+          - not_null
+          - dbt_utils.accepted_range:
+              min_value: 0
+              inclusive: true
+      - name: total_revenue
+        description: "Total revenue (sum of prices) for this category on this date"
+        tests:
+          - not_null
+          - dbt_utils.accepted_range:
+              min_value: 0
+              inclusive: true
+      - name: avg_price_per_event
+        description: "Average price per event (total_revenue / total_events)"
+      - name: dbt_loaded_at
+        description: "Timestamp when dbt processed this record"

@@ -1,0 +1,49 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Bronze Layer Schema",
+  "description": "Schema contract for the Bronze layer (Kafka → Spark Streaming → HDFS Parquet)",
+  "type": "object",
+  "required": ["product_id", "category", "price", "event_ts"],
+  "properties": {
+    "product_id": {
+      "type": "integer",
+      "description": "Product ID from Fake Store API",
+      "minimum": 1
+    },
+    "category": {
+      "type": "string",
+      "description": "Product category",
+      "enum": ["electronics", "jewelery", "men's clothing", "women's clothing"]
+    },
+    "price": {
+      "type": "number",
+      "description": "Product price in USD",
+      "minimum": 0
+    },
+    "title": {
+      "type": "string",
+      "description": "Product title"
+    },
+    "description": {
+      "type": "string",
+      "description": "Product description"
+    },
+    "rating_rate": {
+      "type": "number",
+      "description": "Product rating score",
+      "minimum": 0,
+      "maximum": 5
+    },
+    "rating_count": {
+      "type": "integer",
+      "description": "Number of product ratings",
+      "minimum": 0
+    },
+    "event_ts": {
+      "type": "integer",
+      "description": "Unix timestamp of the event",
+      "minimum": 0
+    }
+  },
+  "additionalProperties": false
+}
