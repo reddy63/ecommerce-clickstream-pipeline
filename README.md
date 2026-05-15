@@ -1,233 +1,318 @@
-Ecommerce Clickstream Data Pipeline
+<div align="center">
 
-A production-style end-to-end Data Engineering pipeline built using Kafka, Spark, HDFS, Airflow, PostgreSQL, Docker, and Metabase.
+# Ecommerce Clickstream Pipeline
 
-This project simulates real-time ecommerce clickstream data ingestion, transformation using the Medallion Architecture (Bronze → Silver → Gold), and serves analytics-ready data to PostgreSQL for dashboard visualization.
+[![Python 3.10+](https://img.shields.io/badge/python-3.10%2B-blue?logo=python&logoColor=white)](https://www.python.org/)
+[![Apache Kafka](https://img.shields.io/badge/Kafka-7.5.0-231F20?logo=apachekafka&logoColor=white)](https://kafka.apache.org/)
+[![Apache Spark](https://img.shields.io/badge/Spark-3.5.8-E25A1C?logo=apachespark&logoColor=white)](https://spark.apache.org/)
+[![Apache Airflow](https://img.shields.io/badge/Airflow-2.x-017CEE?logo=apacheairflow&logoColor=white)](https://airflow.apache.org/)
+[![dbt](https://img.shields.io/badge/dbt-PostgreSQL-FF694B?logo=dbt&logoColor=white)](https://docs.getdbt.com/)
+[![Docker](https://img.shields.io/badge/Docker-Compose-2496ED?logo=docker&logoColor=white)](https://docs.docker.com/compose/)
+[![License: MIT](https://img.shields.io/badge/license-MIT-lightgrey)](LICENSE)
 
-📌 Architecture Overview
-FakeStore API
-     ↓
-Kafka (Streaming Ingestion)
-     ↓
-Spark Structured Streaming (Bronze Layer → HDFS)
-     ↓
-Spark Batch (Silver Layer - Clean & Deduplicate)
-     ↓
-Spark Aggregation (Gold Layer - Business Metrics)
-     ↓
-PostgreSQL (Analytics DB)
-     ↓
-Metabase (Dashboard)
+**End-to-end streaming + batch data pipeline with Medallion Architecture.**  
+Real-time product events stream through Kafka into HDFS via Spark Streaming (Bronze),  
+batch-processed into clean and aggregated layers (Silver → Gold) by Airflow-orchestrated  
+Spark jobs, transformed by dbt, and visualised in Metabase.
 
-🏗 Tech Stack
-Layer	Technology
-Streaming	Apache Kafka
-Processing	Apache Spark (Structured Streaming + Batch)
-Storage	HDFS
-Orchestration	Apache Airflow
-Database	PostgreSQL
-Visualization	Metabase
-Containerization	Docker & Docker Compose
+</div>
 
-📂 Project Structure
-ecommerce-clickstream-pipeline/
-│
-├── airflow/
-│   ├── dags/
-│   │   └── clickstream_pipeline_dag.py
-│   └── Dockerfile
-│
-├── spark-jobs/
-│   ├── silver_clickstream.py
-│   ├── gold_clickstream.py
-│   └── gold_to_postgres.py
-│
-├── spark-streaming/
-│   ├── clickstream_streaming.py
-│   └── Dockerfile
-│
-├── producer/
-│   ├── producer.py
-│   └── Dockerfile
-│
-├── docker-compose.infra.yml
-├── docker-compose.app.yml
-├── docker-compose.airflow.yml
-├── .env
-└── README.md
+---
 
-🥉 Bronze Layer (Raw Data)
+## Architecture
 
-Source: https://fakestoreapi.com/products
+```
+Fake Store API  (https://fakestoreapi.com/products)
+      |  REST poll every 30s — 20 product events per cycle
+      v
++----------------------------------------------------------------------+
+|  Kafka  :9092   topic: clickstream                                   |
+|  (Confluent Platform 7.5.0 — Kafka + Zookeeper)                     |
++----------------------------------------------------------------------+
+                           | Spark Structured Streaming
+                           v
++----------------------------------------------------------------------+
+|  HDFS  hdfs://namenode:9000                                          |
+|                                                                      |
+|  /data/bronze   <- raw Parquet (Spark Streaming, append)            |
+|  /data/silver   <- deduped + timestamps (Spark Batch, partition by  |
+|                    event_date, overwrite)                            |
+|  /data/gold     <- category aggregates (Spark Batch, partition by   |
+|                    event_date, dynamic overwrite)                    |
++----------------------------------------------------------------------+
+                           | Airflow DAG: clickstream_pipeline (@hourly)
+                           | spark-submit: silver -> gold -> gold_to_postgres
+                           v
++----------------------------------------------------------------------+
+|  PostgreSQL   db: analytics   table: clickstream_metrics             |
+|  (Gold data loaded via Spark JDBC — truncate + overwrite)            |
++----------------------------------------------------------------------+
+                           | Airflow DAG: dbt_transform_pipeline (@hourly)
+                           | dbt run -> dbt test -> dbt docs generate
+                           v
++----------------------------------------------------------------------+
+|  dbt (PostgreSQL adapter)                                            |
+|  stg_clickstream (VIEW) -> fct_category_metrics + fct_daily_revenue |
++----------------------------------------------------------------------+
+                           |
+                           v
++----------------------------------------------------------------------+
+|  Metabase  :3000   (connects to PostgreSQL analytics DB)             |
++----------------------------------------------------------------------+
+```
 
-Data ingested via Kafka
+---
 
-Spark Structured Streaming writes raw JSON → HDFS (Parquet)
+## Stack
 
-Partitioned storage
+| Layer | Technology | Version |
+|---|---|---|
+| Event source | Fake Store API | — |
+| Message broker | Apache Kafka + Zookeeper | Confluent 7.5.0 |
+| Stream processing | Spark Structured Streaming | Spark 3.5.8 |
+| Distributed storage | HDFS (Namenode + Datanode) | Hadoop 3.2.1 |
+| Batch processing | PySpark (silver + gold jobs) | Spark 3.5.8 |
+| Orchestration | Apache Airflow (LocalExecutor) | 2.x |
+| Analytics DB | PostgreSQL | — |
+| Transformation | dbt (PostgreSQL adapter) | — |
+| Visualisation | Metabase | latest |
+| Containerisation | Docker + Docker Compose (3 files) | — |
+| Code quality | black, isort, flake8, pre-commit | — |
 
-Checkpointing enabled
+---
 
-Schema:
+## Data layers (Medallion Architecture)
 
-{
-  "product_id": int,
-  "category": string,
-  "price": double,
-  "title": string,
-  "description": string,
-  "rating_rate": double,
-  "rating_count": int,
-  "event_ts": long
-}
+### Bronze — Raw events
+**Location:** `hdfs://namenode:9000/data/bronze` | **Format:** Parquet (append)  
+Written by Spark Structured Streaming directly from the Kafka topic.
 
-🥈 Silver Layer (Clean & Transform)
+| Field | Type | Description |
+|---|---|---|
+| `product_id` | INTEGER | Product ID from Fake Store API (1-20) |
+| `category` | STRING | electronics, jewelery, men's clothing, women's clothing |
+| `price` | DOUBLE | Product price in USD |
+| `title` | STRING | Product title |
+| `description` | STRING | Product description |
+| `rating_rate` | DOUBLE | Average product rating |
+| `rating_count` | INTEGER | Number of ratings |
+| `event_ts` | LONG | Unix timestamp of the event |
 
-Convert epoch → timestamp
+### Silver — Cleaned & enriched
+**Location:** `hdfs://namenode:9000/data/silver` | **Format:** Parquet, partitioned by `event_date`  
+Spark batch job: casts epoch to timestamp, adds `event_date`, deduplicates by `(product_id, event_ts)`.
 
-Add event_date
+### Gold — Aggregated metrics
+**Location:** `hdfs://namenode:9000/data/gold` | **Format:** Parquet, partitioned by `event_date`  
+Spark batch job: groups by `(category, event_date)` to produce `total_events` and `total_revenue`.
 
-Deduplicate records
+| Field | Type | Description |
+|---|---|---|
+| `category` | STRING | Product category |
+| `event_date` | DATE | Partition date |
+| `total_events` | LONG | Count of events for that category + day |
+| `total_revenue` | DOUBLE | Sum of prices for that category + day |
 
-Partition by event_date
+---
 
-Stored in HDFS
+## Airflow DAGs
 
-🥇 Gold Layer (Business Metrics)
+### `clickstream_pipeline` — @hourly
+Orchestrates the Spark batch transformation chain:
+```
+silver_layer  ->  gold_layer  ->  gold_to_postgres
+```
+Each task is a `spark-submit` against `spark://spark-master:7077`.
 
-Aggregated KPIs:
+### `dbt_transform_pipeline` — @hourly
+Runs the dbt layer after Gold data lands in PostgreSQL:
+```
+dbt_run  ->  dbt_test  ->  dbt_docs_generate
+```
 
-Total Events per Category
+---
 
-Total Revenue per Category
+## dbt Models
 
-Grouped by event_date
+```
+dbt_project/models/
+├── sources.yml                     # declares raw.clickstream_metrics source
+├── staging/
+│   ├── _staging_models.yml         # schema tests
+│   └── stg_clickstream.sql         # VIEW — cleans nulls, computes avg_price_per_event
+└── marts/
+    ├── _mart_models.yml            # schema tests
+    ├── fct_category_metrics.sql    # TABLE — category metrics + revenue_pct_of_day
+    │                               #         + revenue_rank (window function)
+    └── fct_daily_revenue.sql       # TABLE — daily revenue rollup across categories
 
-Example Output:
+dbt_project/tests/
+├── assert_no_future_events.sql     # custom test: event_date <= current_date
+└── assert_positive_revenue.sql    # custom test: total_revenue >= 0
+```
 
-category	total_events	total_revenue	event_date
-electronics	54	17954.91	2026-02-17
-🗄 PostgreSQL Analytics Table
+---
 
-Table: clickstream_metrics
+## Data Governance
 
-CREATE TABLE clickstream_metrics (
-    category TEXT,
-    total_events INT,
-    total_revenue DOUBLE PRECISION,
-    event_date DATE,
-    PRIMARY KEY (category, event_date)
-);
+```
+data_governance/
+├── data_contracts/
+│   └── clickstream_contract.yml   # SLA, layer definitions, quality rules
+├── schemas/
+│   ├── bronze_schema.json         # Spark Streaming output schema
+│   ├── silver_schema.json         # Post-deduplication schema
+│   └── gold_schema.json           # Aggregated output schema
+└── docs/
+    └── data_dictionary.md         # Column definitions for all layers
+```
 
+Quality rules enforced via dbt tests:
 
-Loaded using Spark JDBC connector.
+- No null categories or event dates (silver, gold)
+- No negative revenue (gold, dbt marts)
+- No future event dates (gold, dbt marts)
+- Price >= 0 (bronze, silver)
 
-🎯 Airflow Orchestration
+Validate contracts locally:
+```bash
+make governance-check
+```
 
-DAG: clickstream_pipeline
+---
 
-Tasks:
+## Services & ports
 
-silver_layer
+| Container | Port | Description |
+|---|---|---|
+| `kafka` | `9092` | Kafka broker (external access) |
+| `namenode` | `9870` | HDFS Namenode web UI |
+| `spark-master` | `8080` / `7077` | Spark Master UI / submit endpoint |
+| `airflow-webserver` | `8081` | Airflow UI |
+| `metabase` | `3000` | Metabase dashboard |
+| `producer` | — | Fake Store API -> Kafka |
+| `spark-streaming` | — | Kafka -> Bronze (HDFS) |
+| `dbt` | — | dbt run/test (docker profile: dbt) |
 
-gold_layer
+---
 
-gold_to_postgres
+## Quickstart
 
-Schedule: @hourly
+**Prerequisites:** Docker + Docker Compose, Git
 
-Retry enabled.
-
-📊 Dashboard (Metabase)
-
-Connect to PostgreSQL
-
-Create visualizations:
-
-Revenue by Category
-
-Daily Events
-
-Trend analysis
-
-Top categories
-
-Access:
-
-http://localhost:3000
-
-🐳 How to Run the Project
-1️⃣ Clone Repository
-git clone https://github.com/your-username/ecommerce-clickstream-pipeline.git
+```bash
+# 1. Clone
+git clone https://github.com/reddy63/ecommerce-clickstream-pipeline.git
 cd ecommerce-clickstream-pipeline
 
-2️⃣ Create .env File
+# 2. Configure
+cp .env.example .env
+# Edit .env — set POSTGRES_PASSWORD
 
-Example:
-
-POSTGRES_HOST=postgre
-POSTGRES_USER=arun
-POSTGRES_PASSWORD=yourpassword
-POSTGRES_DB=airflow
-POSTGRES_DB1=analytics
-POSTGRES_PORT=5432
-
-3️⃣ Start Infrastructure
+# 3. Start infrastructure (Kafka, HDFS, Spark, Metabase, PostgreSQL)
 docker compose -f docker-compose.infra.yml up -d
 
-4️⃣ Start Streaming App
+# 4. Start application layer (producer, Spark Streaming)
 docker compose -f docker-compose.app.yml up -d --build
 
-5️⃣ Start Airflow
+# 5. Start Airflow
 docker compose -f docker-compose.airflow.yml up -d --build
+```
 
+| Service | URL | Credentials |
+|---|---|---|
+| Airflow UI | http://localhost:8081 | admin / admin |
+| Spark Master | http://localhost:8080 | — |
+| HDFS Namenode | http://localhost:9870 | — |
+| Metabase | http://localhost:3000 | set on first login |
 
-Airflow UI:
+```bash
+# 6. Trigger pipeline (or wait for @hourly Airflow schedule)
+# Airflow UI -> DAGs -> clickstream_pipeline -> Trigger
 
-http://localhost:8081
+# 7. Run dbt transformations manually
+make dbt-run
+make dbt-test
+```
 
-🔥 Key Engineering Concepts Demonstrated
+---
 
-✔ Medallion Architecture
-✔ Real-time Streaming
-✔ Batch Processing
-✔ Distributed Storage (HDFS)
-✔ DAG Orchestration
-✔ Spark JDBC Integration
-✔ Containerized Microservices
-✔ Environment Variable Management
-✔ Production-style Project Structure
+## Make commands
 
-📈 Scalability Improvements (Future Enhancements)
+```bash
+make up               # start infra + app layers
+make down             # stop all services
+make restart          # full rebuild
+make logs             # tail app layer logs
+make dbt-run          # run dbt models
+make dbt-test         # run dbt tests
+make dbt-docs         # generate + serve dbt docs
+make lint             # black + isort + flake8 check
+make format           # black + isort auto-format
+make test             # pytest
+make governance-check # validate JSON schemas + YAML contracts
+make clean            # remove __pycache__, dbt target
+```
 
-Replace LocalExecutor → CeleryExecutor
+---
 
-Add Delta Lake
+## Project structure
 
-Add Data Quality checks
+```
+ecommerce-clickstream-pipeline/
+├── airflow/
+│   ├── dags/
+│   │   ├── clickstream_pipeline_dag.py   # silver -> gold -> postgres (@hourly)
+│   │   └── dbt_transform_dag.py          # dbt run -> test -> docs (@hourly)
+│   └── Dockerfile
+├── data_governance/
+│   ├── data_contracts/clickstream_contract.yml
+│   ├── schemas/                          # bronze / silver / gold JSON schemas
+│   └── docs/data_dictionary.md
+├── dbt_project/
+│   ├── models/
+│   │   ├── staging/stg_clickstream.sql   # VIEW
+│   │   └── marts/
+│   │       ├── fct_category_metrics.sql  # TABLE (window functions)
+│   │       └── fct_daily_revenue.sql     # TABLE
+│   └── tests/                            # custom data quality tests
+├── producer/
+│   ├── producer.py                       # Fake Store API -> Kafka
+│   └── Dockerfile
+├── spark-jobs/
+│   ├── silver_clickstream.py             # Bronze -> Silver (batch)
+│   ├── gold_clickstream.py               # Silver -> Gold (batch)
+│   └── gold_to_postgres.py              # Gold -> PostgreSQL (JDBC)
+├── spark-streaming/
+│   ├── clickstream_streaming.py          # Kafka -> Bronze (streaming)
+│   └── Dockerfile
+├── docker-compose.infra.yml              # Kafka, HDFS, Spark, Metabase
+├── docker-compose.app.yml               # producer, spark-streaming, dbt
+├── docker-compose.airflow.yml           # Airflow init + webserver + scheduler
+├── .env.example
+├── Makefile
+└── .pre-commit-config.yaml
+```
 
-Add CI/CD pipeline
+---
 
-Deploy to AWS (EMR + MSK + RDS)
+## Key concepts demonstrated
 
-Add dbt for transformations
+| Concept | Implementation |
+|---|---|
+| Medallion Architecture | Bronze / Silver / Gold layers on HDFS |
+| Real-time streaming | Spark Structured Streaming <- Kafka topic |
+| Batch processing | PySpark jobs orchestrated by Airflow |
+| Distributed storage | HDFS (Hadoop 3.2.1) |
+| DAG orchestration | Airflow with retry + @hourly schedule |
+| SQL transformation | dbt models with window functions + custom tests |
+| Data governance | Contracts, schemas, data dictionary, SLA definitions |
+| JDBC integration | Spark -> PostgreSQL via org.postgresql driver |
+| Code quality | pre-commit hooks (black, isort, flake8) |
+| Containerised services | 3 Docker Compose files (infra / app / airflow) |
 
-👨‍💻 Author
+---
 
-Arun Reddy
-Entry-Level Data Engineer
-Tech: Python | SQL | Spark | Kafka | Airflow | AWS
+## License
 
-⭐ Why This Project Matters
-
-This project demonstrates:
-
-End-to-end pipeline thinking
-
-Real-world orchestration
-
-Distributed systems understanding
-
-Production-ready architecture
-
-Strong foundation for Data Engineering roles
+MIT
