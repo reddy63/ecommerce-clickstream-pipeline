@@ -20,4 +20,4 @@ ENV SPARK_HOME=/opt/spark
 ENV PATH=$SPARK_HOME/bin:$PATH
 
 USER airflow
-RUN pip install --no-cache-dir psycopg2-binary
+RUN pip install --no-cache-dir     psycopg2-binary     dbt-postgres==1.8.3     dbt-core==1.8.3

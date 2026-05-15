@@ -14,6 +14,11 @@ spark = SparkSession.builder \
     .getOrCreate()
 
 gold_df = spark.read.parquet("hdfs://namenode:9000/data/gold")
+
+if gold_df.rdd.isEmpty():
+    print("GoldToPostgres: Gold layer is empty — nothing to write. Exiting.")
+    spark.stop()
+    exit(0)
 jdbc_url = f"jdbc:postgresql://{POSTGRES_HOST}:{POSTGRES_PORT}/{POSTGRES_DB1}"
 
 gold_df.write \

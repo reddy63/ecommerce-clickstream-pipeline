@@ -35,11 +35,14 @@ services:
       - ./airflow/logs:/opt/airflow/logs
       - ./airflow/plugins:/opt/airflow/plugins
       - ./spark-jobs:/opt/airflow/jobs
+      - ./hadoop-conf:/etc/hadoop/conf:ro
+      - ./dbt_project:/opt/airflow/dbt_project:ro
 
     environment:
       AIRFLOW__CORE__EXECUTOR: LocalExecutor
       AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://${POSTGRES_USER}:${POSTGRES_PASSWORD}@${POSTGRES_HOST}:${POSTGRES_PORT}/${POSTGRES_DB}
       AIRFLOW__CORE__LOAD_EXAMPLES: "false"
+      HADOOP_CONF_DIR: /etc/hadoop/conf
     command: webserver
 
   airflow-scheduler:
@@ -58,11 +61,14 @@ services:
       - ./airflow/logs:/opt/airflow/logs
       - ./airflow/plugins:/opt/airflow/plugins
       - ./spark-jobs:/opt/airflow/jobs
+      - ./hadoop-conf:/etc/hadoop/conf:ro
+      - ./dbt_project:/opt/airflow/dbt_project:ro
 
     environment:
       AIRFLOW__CORE__EXECUTOR: LocalExecutor
       AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://${POSTGRES_USER}:${POSTGRES_PASSWORD}@${POSTGRES_HOST}:${POSTGRES_PORT}/${POSTGRES_DB}
       AIRFLOW__CORE__LOAD_EXAMPLES: "false"
+      HADOOP_CONF_DIR: /etc/hadoop/conf
     command: scheduler
 
 networks:

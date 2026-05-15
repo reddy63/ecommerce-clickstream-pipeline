@@ -25,7 +25,7 @@ df = (
     .format("kafka")
     .option("kafka.bootstrap.servers", "kafka:29092")
     .option("subscribe", "clickstream")
-    .option("startingOffsets", "latest")
+    .option("startingOffsets", "earliest")
     .option("failOnDataLoss", "false")
     .load()
 )

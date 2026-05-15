@@ -6,7 +6,7 @@ ecommerce_clickstream:
       host: "{{ env_var('POSTGRES_HOST', 'postgre') }}"
       port: "{{ env_var('POSTGRES_PORT', '5432') | int }}"
       user: "{{ env_var('POSTGRES_USER', 'arun') }}"
-      pass: "{{ env_var('POSTGRES_PASSWORD', 'Arun!555') }}"
+      pass: "{{ env_var('POSTGRES_PASSWORD') }}"
       dbname: "{{ env_var('POSTGRES_DB1', 'analytics') }}"
       schema: public
       threads: 2
